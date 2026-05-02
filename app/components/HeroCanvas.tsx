@@ -29,39 +29,71 @@ export default function HeroCanvas() {
   const rafRef = useRef<number>(0);
   const sectionRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef<boolean>(false);
+  const loadedCountRef = useRef<number>(0);
+  const firstFrameReadyRef = useRef<boolean>(false);
 
   const [loadProgress, setLoadProgress] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeBeat, setActiveBeat] = useState(0);
 
-  // Preload all frames
+  // Preload first frame eagerly, then load the rest during idle time.
   useEffect(() => {
     let loaded = 0;
     const images: HTMLImageElement[] = new Array(TOTAL_FRAMES);
     framesRef.current = images;
 
-    for (let i = 0; i < TOTAL_FRAMES; i++) {
+    const updateProgress = () => {
+      loadedCountRef.current = loaded;
+      setLoadProgress(Math.round((loaded / TOTAL_FRAMES) * 100));
+    };
+
+    const handleFrameLoaded = (index: number) => {
+      loaded += 1;
+      updateProgress();
+
+      if (index === 0 && !firstFrameReadyRef.current) {
+        firstFrameReadyRef.current = true;
+        loadedRef.current = true;
+        setIsLoaded(true);
+        drawFrame(0);
+      }
+    };
+
+    const loadFrame = (index: number, priority = false) => {
+      if (images[index]) {
+        return;
+      }
+
       const img = new Image();
-      img.src = FRAME_PATH(i);
-      img.onload = () => {
-        loaded++;
-        setLoadProgress(Math.round((loaded / TOTAL_FRAMES) * 100));
-        if (loaded === TOTAL_FRAMES) {
-          loadedRef.current = true;
-          setIsLoaded(true);
-          drawFrame(0);
-        }
-      };
-      img.onerror = () => {
-        loaded++;
-        setLoadProgress(Math.round((loaded / TOTAL_FRAMES) * 100));
-        if (loaded === TOTAL_FRAMES) {
-          loadedRef.current = true;
-          setIsLoaded(true);
-        }
-      };
-      images[i] = img;
-    }
+      if (priority) {
+        img.fetchPriority = 'high';
+      } else {
+        img.decoding = 'async';
+      }
+      img.src = FRAME_PATH(index);
+      img.onload = () => handleFrameLoaded(index);
+      img.onerror = () => handleFrameLoaded(index);
+      images[index] = img;
+    };
+
+    const idleCallback =
+      window.requestIdleCallback ||
+      ((cb: (deadline: { timeRemaining: () => number }) => void) =>
+        window.setTimeout(() => cb({ timeRemaining: () => 0 }), 200));
+
+    const batchLoad = (startIndex: number, batchSize: number) => {
+      const endIndex = Math.min(TOTAL_FRAMES, startIndex + batchSize);
+      for (let i = startIndex; i < endIndex; i += 1) {
+        loadFrame(i);
+      }
+
+      if (endIndex < TOTAL_FRAMES) {
+        idleCallback(() => batchLoad(endIndex, batchSize));
+      }
+    };
+
+    loadFrame(0, true);
+    idleCallback(() => batchLoad(1, 12));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
