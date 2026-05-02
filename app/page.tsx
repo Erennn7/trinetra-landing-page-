@@ -4,7 +4,6 @@ import VisionSection from './components/VisionSection';
 import TechnologySection from './components/TechnologySection';
 import CTASection from './components/CTASection';
 import { Footer2 } from './components/Footer2';
-import LanguageSwitcher from './components/LanguageSwitcher';
 import VoiceNavigator from './components/VoiceNavigator';
 
 const navItems = [
@@ -49,7 +48,6 @@ export default function Home() {
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '260px', justifyContent: 'flex-end' }}>
-          <LanguageSwitcher />
           <a 
             href="http://localhost:5173/#/login"
             className="signin-btn"
